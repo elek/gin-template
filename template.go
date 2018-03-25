@@ -41,12 +41,13 @@ type TemplateEngine struct {
 }
 
 type TemplateConfig struct {
-	Root         string           //view root
-	Extension    string           //template extension
-	Master       string           //template master
-	Partials     []string         //template partial, such as head, foot
-	Funcs        template.FuncMap //template functions
-	DisableCache bool             //disable cache, debug mode
+	Root          string           //view root
+	Extension     string           //template extension
+	Master        string           //template master
+	Partials      []string         //template partial, such as head, foot
+	Funcs         template.FuncMap //template functions
+	DisableCache  bool             //disable cache, debug mode
+	AssetFunction func(string) ([]byte, error)
 }
 
 func New(config TemplateConfig) *TemplateEngine {
@@ -163,8 +164,17 @@ func (e *TemplateEngine) executeTemplate(out io.Writer, name string, data interf
 			}
 			data, err := ioutil.ReadFile(path)
 			if err != nil {
-				return fmt.Errorf("TemplateEngine render read name:%v, path:%v, error: %v", v, path, err)
+				if e.config.AssetFunction != nil {
+					data, err = e.config.AssetFunction(v + e.config.Extension)
+					if err != nil {
+						return fmt.Errorf("Asset loading error :%v error: %v", v + e.config.Extension, err)
+					}
+				} else {
+					// Asset was not found.
+					return fmt.Errorf("TemplateEngine render read name:%v, path:%v, error: %v", v, path, err)
+				}
 			}
+
 			content := fmt.Sprintf("%s", data)
 			tpl, err = tpl.New(v).Funcs(allFuncs).Parse(content)
 			if err != nil {
